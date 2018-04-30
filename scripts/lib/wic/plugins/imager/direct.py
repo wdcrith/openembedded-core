@@ -528,6 +528,8 @@ class PartitionedImage():
                 parted_fs_type = "fat16"
                 if not part.system_id:
                     part.system_id = '0x6' # FAT16
+            elif part.fstype == "ontrackdm6aux3":
+                parted_fs_type = "ontrackdm6aux3"
             else:
                 # Type for ext2/ext3/ext4/btrfs
                 parted_fs_type = "ext2"
