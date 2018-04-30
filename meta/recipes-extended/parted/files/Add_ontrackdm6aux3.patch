@@ -1,0 +1,118 @@
+parted: add ontrack DM6 aux3 support
+
+Add ontrack DM6 aux3 partition support to enable creating
+partitions required to boot i.MX MXS based platforms.
+
+Upstream-Status: Pending
+
+Signed-off-by: Otavio Salvador <otavio@ossystems.com.br>
+
+diff -Nburp parted-3.2.orig/libparted/fs/Makefile.am parted-3.2/libparted/fs/Makefile.am
+--- parted-3.2.orig/libparted/fs/Makefile.am	2014-07-28 04:29:16.000000000 +0200
++++ parted-3.2/libparted/fs/Makefile.am	2015-03-25 19:51:38.912544030 +0100
+@@ -42,6 +42,7 @@ libfs_la_SOURCES =		\
+   linux_swap/linux_swap.c	\
+   nilfs2/nilfs2.c		\
+   ntfs/ntfs.c			\
++  ontrack/ontrack.c		\
+   reiserfs/reiserfs.c		\
+   reiserfs/reiserfs.h		\
+   ufs/ufs.c			\
+diff -Nburp parted-3.2.orig/libparted/fs/ontrack/ontrack.c parted-3.2/libparted/fs/ontrack/ontrack.c
+--- parted-3.2.orig/libparted/fs/ontrack/ontrack.c	1970-01-01 01:00:00.000000000 +0100
++++ parted-3.2/libparted/fs/ontrack/ontrack.c	2015-03-25 19:55:01.342048099 +0100
+@@ -0,0 +1,39 @@
++#include <config.h>
++
++#include <parted/parted.h>
++#include <parted/crc32.h>
++#include <parted/endian.h>
++
++PedGeometry*
++ontrackdm6aux3_probe (PedGeometry* geom)
++{
++	PedSector length = geom->length;
++
++	/* ignore if sector size is not 512bytes for now  */
++	if (geom->dev->sector_size != PED_SECTOR_SIZE_DEFAULT)
++		return NULL;
++
++	return ped_geometry_new(geom->dev, geom->start, length);
++}
++
++static PedFileSystemOps ontrackdm6aux3_ops = {
++	probe:			ontrackdm6aux3_probe,
++};
++
++static PedFileSystemType ontrackdm6aux3_type = {
++	next:   NULL,
++	ops:    &ontrackdm6aux3_ops,
++	name:   "ontrackdm6aux3",
++};
++
++void
++ped_file_system_ontrack_init ()
++{
++	ped_file_system_type_register (&ontrackdm6aux3_type);
++}
++
++void
++ped_file_system_ontrack_done ()
++{
++	ped_file_system_type_unregister (&ontrackdm6aux3_type);
++}
+diff -Nburp parted-3.2.orig/libparted/labels/dos.c parted-3.2/libparted/labels/dos.c
+--- parted-3.2.orig/libparted/labels/dos.c	2014-06-15 20:17:43.000000000 +0200
++++ parted-3.2/libparted/labels/dos.c	2015-03-25 19:51:38.916543965 +0100
+@@ -83,6 +83,7 @@ static const char MBR_BOOT_CODE[] = {
+ #define PARTITION_COMPAQ_DIAG	0x12
+ #define PARTITION_MSFT_RECOVERY	0x27
+ #define PARTITION_LDM		0x42
++#define PARTITION_ONTRACK_DM6_AUX3	0x53
+ #define PARTITION_LINUX_SWAP	0x82
+ #define PARTITION_LINUX		0x83
+ #define PARTITION_IRST		0x84
+@@ -1500,6 +1501,8 @@ msdos_partition_set_system (PedPartition
+ 		dos_data->system = PARTITION_HFS;
+ 	else if (!strcmp (fs_type->name, "sun-ufs"))
+ 		dos_data->system = PARTITION_SUN_UFS;
++	else if (!strcmp (fs_type->name, "ontrackdm6aux3"))
++		dos_data->system = PARTITION_ONTRACK_DM6_AUX3;
+ 	else if (is_linux_swap (fs_type->name))
+ 		dos_data->system = PARTITION_LINUX_SWAP;
+ 	else
+diff -Nburp parted-3.2.orig/libparted/libparted.c parted-3.2/libparted/libparted.c
+--- parted-3.2.orig/libparted/libparted.c	2014-06-15 20:17:43.000000000 +0200
++++ parted-3.2/libparted/libparted.c	2015-03-25 19:51:38.912544030 +0100
+@@ -110,6 +110,7 @@ extern void ped_file_system_fat_init (vo
+ extern void ped_file_system_ext2_init (void);
+ extern void ped_file_system_nilfs2_init (void);
+ extern void ped_file_system_btrfs_init (void);
++extern void ped_file_system_ontrack_init (void);
+ 
+ static void
+ init_file_system_types ()
+@@ -126,6 +127,7 @@ init_file_system_types ()
+ 	ped_file_system_ext2_init ();
+ 	ped_file_system_nilfs2_init ();
+ 	ped_file_system_btrfs_init ();
++	ped_file_system_ontrack_init ();
+ }
+ 
+ extern void ped_disk_aix_done ();
+@@ -177,6 +179,7 @@ _init()
+ #endif
+ }
+ 
++extern void ped_file_system_ontrack_done (void);
+ extern void ped_file_system_nilfs2_done (void);
+ extern void ped_file_system_ext2_done (void);
+ extern void ped_file_system_fat_done (void);
+@@ -193,6 +196,7 @@ extern void ped_file_system_btrfs_done (
+ static void
+ done_file_system_types ()
+ {
++	ped_file_system_ontrack_done ();
+ 	ped_file_system_nilfs2_done ();
+ 	ped_file_system_ext2_done ();
+ 	ped_file_system_fat_done ();
